@@ -1,0 +1,4 @@
+﻿  Tile.cpp
+F:\My Coding Projects\C++\Maze\Maze\Tile.cpp(76,57): warning C4267: 'argument': conversion from 'size_t' to 'int', possible loss of data
+F:\My Coding Projects\C++\Maze\Maze\Tile.cpp(96,18): warning C4838: conversion from 'int' to 'SHORT' requires a narrowing conversion
+  Maze.vcxproj -> F:\My Coding Projects\C++\Maze\x64\Debug\Maze.exe
