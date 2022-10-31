@@ -15,7 +15,7 @@ int main()
     CONSOLE_SCREEN_BUFFER_INFO csbInfo;
     HANDLE hOutputBuffer = GetStdHandle(STD_OUTPUT_HANDLE);
     GetConsoleScreenBufferInfo(hOutputBuffer, &csbInfo);
-    Tile tile{2, 2};
+    Tile tile{4, 2};
     tile.buildMaze(9, 9, hOutputBuffer);
     
     
