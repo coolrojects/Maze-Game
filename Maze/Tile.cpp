@@ -10,6 +10,7 @@ Tile::TileSize tileSize;
 vector<Tile::Node> nodes;
 CONSOLE_SCREEN_BUFFER_INFO csbInfo;
 HANDLE outputHandle;
+int lastRandomNumber = 0, sameRandomCount = 0;
 
 //methods
 
@@ -33,10 +34,11 @@ Tile::Tile(short tileWidth, short tileHeight) {
 /// creates nodes list with the given size and each with respect to their tile number
 /// </summary>
 /// <param name="size"></param>
-void Tile::createNodes(int size) {
+void Tile::createNodes(int size, int numOfCols) {
 	nodes.resize(size);
 	for (int i = 0; i < nodes.size(); i++) {
 		nodes[i].number = i;
+		setHouseMetaInfo(numOfCols, nodes[i]);
 	}
 }
 
@@ -48,43 +50,94 @@ int Tile::randomNumber(int min, int max) {
 
 }
 
-int Tile::chooseNeighbour(int houseNumber, short maxMazeRows, short maxMazeCols) {
+void Tile::setHouseMetaInfo(int numOfCols, Node& house) {
+	house.houseRow = house.number / numOfCols;
+	house.rowStartNum = house.houseRow * (numOfCols);
+	house.houseCol = house.number - house.rowStartNum;
+	house.startPos.X = house.houseCol * tileSize.width + house.houseCol;
+	house.startPos.Y = house.houseRow * tileSize.height + house.houseRow;
+	house.wallRightPos.X = house.startPos.X + tileSize.width;
+	house.wallRightPos.Y = house.startPos.Y;
+	house.wallUpPos.X = house.startPos.X;
+	house.wallUpPos.Y = house.startPos.Y - 1;
+
+	//left neighbour 
+	if (house.houseCol > 0) {
+		house.neighbourLeft = house.number - 1;
+	}
+	else {
+		house.neighbourLeft = NULL;
+	}
+
+	//right neighbour
+	if (house.houseCol < numOfCols - 1) {
+		house.neighbourRight = house.number + 1;
+	}
+	else {
+		house.neighbourRight = NULL;
+	}
+
+	//if node not in 0th row then find upper neighbour
+	if (house.houseRow > 0) {
+		house.neighbourUp = ((house.houseRow - 1) * numOfCols) + house.houseCol;
+	}
+	else {
+		house.neighbourUp = NULL;
+	}
+
+	//if node not in last row then find below neighbour
+	if (house.houseRow < (numOfCols - 1)) {
+		house.neighbourBelow = ((house.houseRow + 1) * numOfCols) + house.houseCol;
+	}
+	else {
+		house.neighbourBelow = NULL;
+	}
+}
+
+int Tile::chooseNeighbour(Node& house, short maxMazeRows, short maxMazeCols) {
 	vector<int> neighbours;
-	int houseRow = (int)(houseNumber /maxMazeCols);
-	int rowStartNum = houseRow * (maxMazeCols);
-	int houseCol = houseNumber - rowStartNum;
 	int neighbourNumber;
 	//cout << "\ncol: " << houseCol << " rowStart" << rowStartNum;
 	//left neighbour 
-	if (houseCol > 0) {
-		neighbourNumber = houseNumber - 1;
+	if (house.houseCol > 0) {
+		neighbourNumber = house.neighbourLeft;
 		if (!nodes[neighbourNumber].visited) {
 			neighbours.push_back(neighbourNumber);
 		}
 	}
 	//right neighbour
-	if (houseCol < maxMazeCols - 1) {
-		neighbourNumber = houseNumber + 1;
+	if (house.houseCol < maxMazeCols - 1) {
+		neighbourNumber = house.neighbourRight;
 		if (!nodes[neighbourNumber].visited) {
-			neighbours.push_back(houseNumber + 1);
+			neighbours.push_back(house.neighbourRight);
 		}
 	}
 	//if node not in 0th row then find upper neighbour
-	if (houseRow > 0) {
-		int upperNeighbour = ((houseRow - 1) * maxMazeCols) + houseCol;
+	if (house.houseRow > 0) {
+		int upperNeighbour = house.neighbourUp;
 		if (!nodes[upperNeighbour].visited) {
 			neighbours.push_back(upperNeighbour); 
 		}
 	}
 	//if node not in last row then find below neighbour
-	if (houseRow < (maxMazeRows - 1)) {
-		int belowNeighbour = ((houseRow + 1) * maxMazeCols) + houseCol;
+	if (house.houseRow < (maxMazeRows - 1)) {
+		int belowNeighbour = house.neighbourBelow;
 		if (!nodes[belowNeighbour].visited) {
 			neighbours.push_back(belowNeighbour);
 		}
 	}
 	if (neighbours.size() > 0) {
 		int randomValue = randomNumber(0, neighbours.size() - 1);
+		while (sameRandomCount > 6) {
+			randomValue = randomNumber(0, neighbours.size() - 1);
+			if (randomValue == lastRandomNumber) {
+				sameRandomCount++;
+			}
+			else {
+				sameRandomCount = 0;
+				lastRandomNumber = randomValue;
+			}
+		}
 		//cout << "\nNodes size: " << neighbours.size();
 		return neighbours[randomValue];
 	}
@@ -106,25 +159,21 @@ void Tile::numberedMaze(int numOfRows, int numOfCols) {
 			pos = tile * tileSize.width + wallX;
 			mousePos.X = pos;
 			SetConsoleCursorPosition(outputHandle, mousePos);
-			cout << count << '_';
+			cout << count;
 			mousePos.X = pos + wallPos;
 			SetConsoleCursorPosition(outputHandle, mousePos);
 			cout << '|';
 		}
 	}
 }
-
-void Tile::removeNumberFromNumberedMaze(int numOfRows, int numOfCols, int numberToRemove, char ch) {
-	int houseRow = (int)(numberToRemove / numOfCols);
-	int rowStartNum = houseRow * (numOfCols);
-	int houseCol = numberToRemove - rowStartNum;
+void Tile::removeNumberFromNumberedMaze(int numOfRows, int numOfCols, Node& house, char ch) {
 
 	GetConsoleScreenBufferInfo(outputHandle, &csbInfo);
 	COORD mouseErasePos{ 0, 0 }, mousePrevPos{0, 0};
 	mousePrevPos = csbInfo.dwCursorPosition;
 
-	mouseErasePos.X = houseCol * tileSize.width + houseCol;
-	mouseErasePos.Y = houseRow * tileSize.height + houseRow;
+	mouseErasePos.X = house.startPos.X;
+	mouseErasePos.Y = house.startPos.Y;
 	SetConsoleCursorPosition(outputHandle, mouseErasePos);
 	for (int i = 0; i < tileSize.width; i++) {
 		if (i == tileSize.width / 2) {
@@ -155,28 +204,104 @@ void Tile::wait(milliseconds milliSecondsToWait) {
 		 SetConsoleCursorPosition(outputHandle, cursorPos);*/
 	}
 }
+
+void Tile::buildWalls(int numOfCols) {
+	int waitTime = 15;
+	COORD wallPosRight, wallPosUp;
+	for (int i = 0; i < nodes.size(); i++) {
+		bool hasConnectionRight = false, hasConnectionUp = false;
+		//find if right or upper neighbour is connected
+		for (int j = 0; j < nodes[i].connectingNodeNumber.size(); j++) {
+			if (nodes[i].connectingNodeNumber[j] == nodes[i].neighbourRight) {
+				hasConnectionRight = true;
+			}
+			if (nodes[i].houseRow != 0) {
+				if (nodes[i].connectingNodeNumber[j] == nodes[i].neighbourUp) {
+					hasConnectionUp = true;
+				}
+			}
+		}
+		//build right wall
+		if (!hasConnectionRight || nodes[i].houseCol == (numOfCols - 1)) {
+			wallPosRight = nodes[i].wallRightPos;
+			if (nodes[i].houseRow != 0) {
+				wallPosRight.Y--;
+			}
+			int b = 0;
+			if (nodes[i].neighbourBelow != NULL) {
+				b = -1;
+			}
+			else {
+				b = 0;
+			}
+			for (int k = b; k <= tileSize.height; k++) {
+				SetConsoleCursorPosition(outputHandle, wallPosRight);
+				cout << '|';
+				wait((milliseconds)waitTime);
+				wallPosRight.Y++;
+			}
+		}
+		//build upper wall
+		if (!hasConnectionUp && nodes[i].houseRow != 0) {
+			wallPosUp = nodes[i].wallUpPos;
+			int b;
+			//if it doesn't have connection right then we must have already built a wall so
+			//don't build wall on that area again
+			if (!hasConnectionRight) {
+				b = 1;
+			}
+			else {
+				b = 0;
+			}
+			for (int k = b; k <= tileSize.width; k++) {
+				SetConsoleCursorPosition(outputHandle, wallPosUp);
+				cout << '-';
+				wait((milliseconds)waitTime);
+				wallPosUp.X++;
+			}
+		}
+		if (nodes[nodes.size() - 1].houseRow == nodes[i].houseRow) {
+			wallPosUp = nodes[i].startPos;
+			wallPosUp.Y += tileSize.height;
+			for (int k = 0; k <= tileSize.width; k++) {
+				SetConsoleCursorPosition(outputHandle, wallPosUp);
+				cout << '-';
+				wait((milliseconds)waitTime);
+				wallPosUp.X++;
+			}
+		}
+
+	}
+
+	COORD endCursorPos = nodes[nodes.size() - 1].startPos;
+	endCursorPos.Y += tileSize.height;
+	SetConsoleCursorPosition(outputHandle, endCursorPos);
+	cout << "\n";
+}
 /// <summary>
 /// builds maze with specified number of columns and rows
 /// </summary>
 /// <param name="numberOfColumns"></param>
 void Tile::buildMaze(short numberOfColumns, short numberOfRows, HANDLE &handleOutput) {
+	nodes.clear();
+	nodes.resize(numberOfColumns * numberOfRows);
 	outputHandle = handleOutput;
 	int totBlockTiles = numberOfColumns * numberOfRows;
 	int visitedCount = 0;
 	stack<Node> visitedNodeStack;
-	createNodes(totBlockTiles);
+	createNodes(totBlockTiles, numberOfColumns);
 	int house = 0;
 	int neighbour = 1;
 
-	numberedMaze(numberOfRows, numberOfColumns);
+	//numberedMaze(numberOfRows, numberOfColumns);
 	cout << "\n";
 	visitedNodeStack.push(nodes[house]);
 	visitedNodeStack.top().visited = true;
 	visitedCount++;
-	removeNumberFromNumberedMaze(numberOfRows, numberOfColumns, house, '*');
+	removeNumberFromNumberedMaze(numberOfRows, numberOfColumns, nodes[house], '*');
 	//connect nodes and build walls around each node where nodes are not connected
 	while (visitedCount < (totBlockTiles)) {
-		neighbour = chooseNeighbour(house, numberOfRows, numberOfColumns);
+		neighbour = chooseNeighbour(nodes[house], numberOfRows, numberOfColumns);
 		if (neighbour == 0) {
 			while (neighbour == 0 && visitedCount < totBlockTiles) {
 				visitedNodeStack.pop();
@@ -186,48 +311,44 @@ void Tile::buildMaze(short numberOfColumns, short numberOfRows, HANDLE &handleOu
 				}
 				else {
 					house = visitedNodeStack.top().number;
-					neighbour = chooseNeighbour(house, numberOfRows, numberOfColumns);
+					neighbour = chooseNeighbour(nodes[house], numberOfRows, numberOfColumns);
 				}
 			}
 		}
 		if (visitedCount != totBlockTiles) {
 			if (!nodes[neighbour].visited) {
 				nodes[neighbour].visited = true;
+				nodes[neighbour].connectingNodeNumber.push_back(house);
+				nodes[house].connectingNodeNumber.push_back(neighbour);
 				visitedNodeStack.push(nodes[neighbour]);
 				visitedCount++;
 				int direction = house - neighbour;
-				char ch = '%';
-				if (direction == -1) {
-					ch = '>';
-				}
-				else if (direction == 1) {
-					ch = '<';
-				}
-				else if (direction < -1) {
-					ch = 'v';
-				}
-				else if (direction > 1) {
-					ch = '^';
-				}
-				else {
-					ch = '%';
-				}
-
+				char ch = ' ';
+				////right
+				//if (direction == -1) {
+				//	ch = 'L';
+				//}
+				////Left
+				//else if (direction == 1) {
+				//	ch = 'R';
+				//}
+				////down
+				//else if (direction < -1) {
+				//	ch = 'U';
+				//}
+				////up
+				//else if (direction > 1) {
+				//	ch = 'D';
+				//}
+				//else {
+				//	ch = '%';
+				//}
 				house = neighbour;
 				//cout << "\n" << visitedCount << ".node Nmber : " << visitedNodeStack.top().number;
-				removeNumberFromNumberedMaze(numberOfRows, numberOfColumns, house, ch);
-				wait((milliseconds)500);
+				removeNumberFromNumberedMaze(numberOfRows, numberOfColumns, nodes[house], ch);
+				wait((milliseconds)15);
 			}
 		}
 	}
-
-	//while (cin && neighbour != 0) {
-	//	neighbour = chooseNeighbour(house, numberOfRows, numberOfColumns);
-	//	if (neighbour > 0) {
-	//		nodes[neighbour].visited = true;
-	//		visitedNodeStack.push(nodes[neighbour]);
-	//		cout << "node Number : " << visitedNodeStack.top().number;
-	//	}
-	//	//cin >> neighbour;
-	//}
+	buildWalls(numberOfColumns);
 }

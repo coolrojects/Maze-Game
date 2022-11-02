@@ -18,7 +18,11 @@ public:
 	struct Node {
 		bool visited;
 		int number;
-		int connectingNodeNumber;
+		vector<int> connectingNodeNumber;
+		int houseCol, rowStartNum, houseRow;
+		int neighbourLeft, neighbourRight, neighbourUp, neighbourBelow;
+		COORD startPos;
+		COORD wallRightPos, wallUpPos;
 	};
 
 	Tile(short tileWidth, short tileHeight);
@@ -27,11 +31,13 @@ public:
 	/// builds maze
 	/// <summary>
 	void buildMaze(short numberOfColumns, short numberOfRows, HANDLE& handleOutput);
-	void createNodes(int size);
-	int chooseNeighbour(int houseNumber, short maxMazeRows, short maxMazeCols);
+	void createNodes(int size, int numOfCols);
+	int chooseNeighbour(Node& house, short maxMazeRows, short maxMazeCols);
 	int randomNumber(int min, int max);
 	void numberedMaze(int numOfRows, int numOfCols);
-	void removeNumberFromNumberedMaze(int numOfRows, int numOfCols, int numberToRemove, char ch);
+	void removeNumberFromNumberedMaze(int numOfRows, int numOfCols, Node& house, char ch);
 	void wait(milliseconds milliSecondsToWait);
+	void buildWalls(int numOfCols);
+	void setHouseMetaInfo(int numOfCols, Node& house);
 };
 
